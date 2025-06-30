@@ -90,12 +90,47 @@ export async function getPhotoUrl(photoId, type) {
     switch (type) {
         case "icon":
             photoUrl = photo.thumb_icon;
+            break;
         case "profile":
             photoUrl = photo.thumb_profile;
+            break;
         case "main":
             photoUrl = photo.thumb_main;
+            break;
         default:
             photoUrl = photo.file_url;
+            break;
     }
     return `${process.env.BASE_URL}/${photoUrl}`;
+}
+
+export function formatDateTime(timestamp, type = 'date', ampm = false) {
+    const dateObj = new Date(timestamp);
+
+    const month = (dateObj.getMonth() + 1).toString().padStart(2, "0");
+    const day = dateObj.getDate().toString().padStart(2, "0");
+    const year = dateObj.getFullYear();
+
+    let hours = dateObj.getHours();
+    const minutes = dateObj.getMinutes().toString().padStart(2, "0");
+    const seconds = dateObj.getSeconds().toString().padStart(2, "0");
+
+    const formattedDate = `${year}-${month}-${day}`;
+    let formattedTime = `${hours}:${minutes}:${seconds}`;
+
+    if(ampm) {
+        const suffix  = hours >= 12 ? "PM" : "AM";
+        hours = hours % 12 || 12;
+        formattedTime = `${hours}:${minutes} ${suffix }`;
+    }
+
+    if(type === 'datetime') {
+        return formattedDate+" "+formattedTime;
+    }else if(type === 'date') {
+        return formattedDate;
+    }else if (type === 'time') {
+        return formattedTime;
+    } else {
+        return formattedDate+" "+formattedTime;
+    }
 }

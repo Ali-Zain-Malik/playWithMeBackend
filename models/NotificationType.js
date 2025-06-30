@@ -5,10 +5,22 @@ const notificationTypeSchema = new mongoose.Schema({
         type: Number,
         required: true,
     },
-    title: {
+    type: {
+        type: String,
+        required: true,
+    },
+    message: {
         type: String,
         required: true,
     }
 });
+
+notificationTypeSchema.statics.getNotificationMessage = async function (type) {
+    const notification =  await this.findOne({ type });
+    if(!notification) {
+        return null;
+    }
+    return notification.message;
+}
 
 export default mongoose.model("notification_type", notificationTypeSchema);

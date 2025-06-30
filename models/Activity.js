@@ -11,10 +11,10 @@ const activitySchema = new mongoose.Schema({
         required: true,
     },
     date: {
-        type: Date,
+        type: String,
     },
     time: {
-        type: Date,
+        type: String,
     },
     activity: {
         type: String,
@@ -54,4 +54,4 @@ const activitySchema = new mongoose.Schema({
     },
 });
 
-export default mongoose.model("activities", activitySchema);
+export default mongoose.model("activity", activitySchema);
