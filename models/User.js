@@ -1,7 +1,9 @@
 import mongoose from "mongoose";
 import Location from "./Location.js";
 import Category from "./Category.js";
-import { getPhotoUrl } from "../utils/functions.js";
+import { getPhotoUrl, isEmpty } from "../utils/functions.js";
+
+import bcrypt from "bcrypt";
 
 const userSchema = new mongoose.Schema({
     first_name: {
@@ -146,5 +148,17 @@ userSchema.methods.getDisplayName = function (name) {
 
     return "";
 };
+
+userSchema.methods.isPasswordValid = async function (password) {
+    return await bcrypt.compare(password, this.password);
+}
+
+userSchema.methods.isOwner = function(ownerId) {
+    if(isEmpty(ownerId) || isEmpty(this._id)) {
+        return false;
+    }
+
+    return this._id.toString() === ownerId.toString()
+}
 
 export default mongoose.model("user", userSchema);

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { isEmpty } from "../utils/functions.js";
 
 const blockedUserSchema = new mongoose.Schema({
     user_id: {
@@ -12,5 +13,14 @@ const blockedUserSchema = new mongoose.Schema({
         required: true,
     },
 });
+
+blockedUserSchema.statics.blockStatus = async function(user_id, owner_id) {
+    const block = await this.findOne({
+        user_id,
+        owner_id,
+    });
+
+    return !isEmpty(block) ? true : false;
+}
 
 export default mongoose.model("blocked_user", blockedUserSchema);
