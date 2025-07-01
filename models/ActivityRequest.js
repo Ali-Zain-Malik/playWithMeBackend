@@ -17,7 +17,7 @@ const activityRequestSchema = new mongoose.Schema({
         required: true,
     },
     status: {
-        type: Boolean,
+        type: Number,
         default: 0,
     },
     user_message: {
@@ -29,5 +29,13 @@ const activityRequestSchema = new mongoose.Schema({
         default: null,
     },
 });
+
+activityRequestSchema.statics.getActivityRequest = async function (activity, userId) {
+    return await this.findOne({
+            activity_id: activity._id,
+            owner_id: activity.owner_id,
+            user_id: userId,
+        });
+}
 
 export default mongoose.model("activity_request", activityRequestSchema);

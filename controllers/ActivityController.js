@@ -7,6 +7,7 @@ import Location from "../models/Location.js";
 import NotificationType from "../models/NotificationType.js";
 
 import { verifyRequiredParams, validateLocation, formatDateTime, isEmpty } from "../utils/functions.js";
+import ActivityRequest from "../models/ActivityRequest.js";
 
 export async function create(req, res) {
     try {
@@ -147,6 +148,230 @@ export async function edit(req, res) {
             location: locationObject,
         }
         res.sendResponse(response, 200);
+    } catch (error) {
+        res.sendResponse({
+            message: "Internal server error",
+            error: error,
+        }, 201);
+    }
+}
+
+async function saveActivityRequest(values) {
+    // Remove unwanted fields
+    delete values.save;
+
+    let request_id;
+
+    // If request_id is not provided, create a new request
+    if (isEmpty(values.request_id)) {
+        const request = await ActivityRequest.create(values);
+        request_id = request._id;
+    } else {
+        request_id = values.request_id;
+        await ActivityRequest.updateOne({ _id: request_id }, values);
+    }
+
+    return request_id;
+}
+
+export async function join(req, res) {
+    try {
+        const data = req.body;
+        verifyRequiredParams(['activityId'], data, res);
+    
+        const activityId = data.activityId;
+        const userMessage = data.userMessage?.trim() || null;
+    
+        if(!isValidObjectId(activityId)) {
+            res.sendResponse({ message: "Activity does not exist" }, 201);
+            return;
+        }
+    
+        const activity = await Activity.findById(activityId);
+        if(isEmpty(activity)) {
+            res.sendResponse({ message: "Activity does not exist" }, 201);
+            return;
+        }
+    
+        const user = req.user;
+        if(user.isOwner(activity.owner_id)) {
+            res.sendResponse({ message: "You are the owner of this activity and cannot perform this action as a participant." }, 201);
+            return;
+        }
+    
+        const activityRequest = await ActivityRequest.getActivityRequest(activity, user._id);
+        if(!isEmpty(activityRequest)) {
+            res.sendResponse({ message: "You have already requested for this activity."}, 201);
+            return;
+        }
+        
+        const values = {
+            activity_id: activityId,
+            owner_id: activity.owner_id,
+            user_id: user._id,
+            user_message: userMessage,
+            status: 0,
+        }
+        
+        await saveActivityRequest(values);
+        res.sendResponse({ message: "Request sent successfully" }, 200);
+    } catch (error) {
+        res.sendResponse({
+            message: "Internal server error",
+            error: error,
+        }, 201);
+    }
+}
+
+export async function accept(req, res) {
+    try {
+        const data = req.body;
+        verifyRequiredParams(['activityId', 'userId'], data, res);
+        
+        const activityId = data.activityId;
+        const userId = data.userId;
+        const ownerMessage = data.ownerMessage?.trim() || null;
+
+        if(!isValidObjectId(activityId)) {
+            res.sendResponse({ message: "Activity does not exist" }, 201);
+            return;
+        }
+        if(!isValidObjectId(userId)) {
+            res.sendResponse({ message: "Invalid User ID" }, 201);
+            return;
+        }
+
+        const activity = await Activity.findById(activityId);
+        const activityRequest = await ActivityRequest.getActivityRequest(activity, userId);
+        if(isEmpty(activity) || isEmpty(activityRequest)) {
+            res.sendResponse({ message: "Activity or request does not exist" }, 201);
+            return;
+        }
+
+        const values = {
+            activity_id: activityId,
+            owner_id: activity.owner_id,
+            user_id: userId,
+            owner_message: ownerMessage,
+            status: 1,
+            request_id: activityRequest._id,
+        }
+
+        await saveActivityRequest(values);
+        res.sendResponse({ message: "Request Accepted" }, 200);
+    } catch (error) {
+        res.sendResponse({
+            message: "Internal server error",
+            error: error,
+        }, 201);
+    }
+}
+
+export async function reject(req, res) {
+    try {
+        const data = req.body;
+        verifyRequiredParams(['activityId', 'userId'], data, res);
+        
+        const activityId = data.activityId;
+        const userId = data.userId;
+        const ownerMessage = data.ownerMessage?.trim() || null;
+
+        if(!isValidObjectId(activityId)) {
+            res.sendResponse({ message: "Activity does not exist" }, 201);
+            return;
+        }
+        if(!isValidObjectId(userId)) {
+            res.sendResponse({ message: "Invalid User ID" }, 201);
+            return;
+        }
+
+        const activity = await Activity.findById(activityId);
+        const activityRequest = await ActivityRequest.getActivityRequest(activity, userId);
+        if(isEmpty(activity) || isEmpty(activityRequest)) {
+            res.sendResponse({ message: "Activity or request does not exist" }, 201);
+            return;
+        }
+
+        const user = req.user;
+        if(!user.isOwner(activity.owner_id)) {
+            res.sendResponse({ message: "Unauthorized" }, 201);
+            return;
+        }
+
+        const values = {
+            activity_id: activityId,
+            owner_id: activity.owner_id,
+            user_id: userId,
+            owner_message: ownerMessage,
+            status: 2,
+            request_id: activityRequest._id,
+        }
+
+        await saveActivityRequest(values);
+        res.sendResponse({ message: "Request Rejected" }, 200);
+    } catch (error) {
+        res.sendResponse({
+            message: "Internal server error",
+            error: error,
+        }, 201);
+    }
+}
+
+export async function cancel(req, res) {
+    try {
+        const user = req.user;
+        const data = req.body;
+
+        verifyRequiredParams(['activityId'], data, res);
+
+        const activityId = data.activityId;
+        const ownerMessage = data.ownerMessage?.trim() || null;
+        let userId = data.userId;
+
+        if(!isValidObjectId(activityId)) {
+            res.sendResponse({ message: "Activity does not exist" }, 201);
+            return;
+        }
+
+        const activity = await Activity.findById(activityId);
+        if (isEmpty(activity)) {
+            return res.sendResponse({ message: 'Activity does not exist' }, 201);
+        }
+
+        let requestObject = null;
+
+        if (user.isOwner(activity.owner_id)) {
+            if(!isValidObjectId(userId)) {
+                res.sendResponse({ message: "Invalid User ID" }, 201);
+                return;
+            }
+            requestObject = await ActivityRequest.getActivityRequest(activity, userId);
+        } else {
+            userId = user._id;
+            requestObject = await ActivityRequest.getActivityRequest(activity, userId);
+        }
+
+        if (isEmpty(requestObject)) {
+            return res.sendResponse({ message: 'Request does not exist' }, 201);
+        }
+
+        if (!user.isOwner(activity.owner_id)) {
+            await ActivityRequest.deleteOne({
+                activity_id: activityId,
+                user_id: requestObject.user_id,
+                owner_id: requestObject.owner_id
+            });
+        } else {
+            const values = {
+                request_id: requestObject._id,
+                status: 0,
+                owner_message: ownerMessage,
+            }
+            await saveActivityRequest(values);
+        }
+
+        return res.sendResponse({ message: "Cancelled successfully" }, 200);
+
     } catch (error) {
         res.sendResponse({
             message: "Internal server error",
