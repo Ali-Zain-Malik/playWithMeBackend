@@ -6,8 +6,9 @@ import Connection from "../models/Connection.js";
 import Location from "../models/Location.js";
 import NotificationType from "../models/NotificationType.js";
 
-import { verifyRequiredParams, validateLocation, formatDateTime, isEmpty } from "../utils/functions.js";
+import { verifyRequiredParams, validateLocation, formatDateTime, isEmpty, getPhotoUrl } from "../utils/functions.js";
 import ActivityRequest from "../models/ActivityRequest.js";
+import User from "../models/User.js";
 
 export async function create(req, res) {
     try {
@@ -371,6 +372,139 @@ export async function cancel(req, res) {
         }
 
         return res.sendResponse({ message: "Cancelled successfully" }, 200);
+
+    } catch (error) {
+        res.sendResponse({
+            message: "Internal server error",
+            error: error,
+        }, 201);
+    }
+}
+
+export async function deleteActivity(req, res) {
+    try {
+        const data = req.body;
+        const user = req.user;
+        verifyRequiredParams(['activityId'], data, res);
+        
+        const activityId = data.activityId;
+        if(!isValidObjectId(activityId)) {
+            res.sendResponse({ message: "Activity does not exist" } , 201);
+            return;
+        }
+
+        const activity = await Activity.findById(activityId);
+        if(isEmpty(activity)) {
+            res.sendResponse({ message: "Activity does not exist" } , 201);
+            return;
+        }
+        if(!user.isOwner(activity.owner_id)) {
+            res.sendResponse({ message: "Unauthorized" }, 201);
+            return;
+        }
+
+        await activity.deleteActivity(user._id);
+
+        res.sendResponse({ message: "Deleted successfully" }, 200);
+    } catch (error) {
+        res.sendResponse({
+            message: "Internal server error",
+            error: error,
+        }, 201);
+    }
+}
+
+export async function deleteRequest(req, res) {
+    try {
+        const data = req.body;
+        const user = req.user;
+        verifyRequiredParams(['activityId', 'userId'], data, res);
+
+        const activityId = data.activityId;
+        const userId = data.userId;
+
+        if (!isValidObjectId(activityId)) {
+            res.sendResponse({ message: "Activity does not exist" }, 201);
+            return;
+        }
+        if(!isValidObjectId(userId)) {
+            res.sendResponse({ message: "Invalid User ID" }, 201);
+            return;
+        }
+
+        const activity = await Activity.findById(activityId);
+        const request = await ActivityRequest.getActivityRequest(activity, userId);
+
+        if (isEmpty(activity) || isEmpty(request)) {
+            res.sendResponse({ message: "Activity or request does not exist" }, 201);
+            return;
+        }
+        if(!user.isOwner(request.owner_id)) {
+            res.sendResponse({ message: "Unauthorized" }, 201);
+            return;
+        }
+
+        await ActivityRequest.deleteOne({
+            activity_id: activityId,
+            user_id: userId,
+            owner_id: user._id
+        });
+
+        return res.sendResponse({ message: "Deleted successfully" }, 200);
+    } catch (error) {
+        res.sendResponse({
+            message: "Internal server error",
+            error: error,
+        }, 201);
+    }
+}
+
+export async function requests(req, res) {
+    try {
+        const data = req.body;
+        verifyRequiredParams(['activityId'], data, res);
+
+        const activityId = data.activityId;
+
+        if (!isValidObjectId(activityId)) {
+            return res.sendResponse({ message: "Activity does not exist" }, 201);
+        }
+
+        const activity = await Activity.findById(activityId);
+        if (isEmpty(activity)) {
+            return res.sendResponse({ message: "Activity does not exist" }, 201);
+        }
+
+        const requests = await ActivityRequest.find({ activity_id: activityId });
+        const response = {
+            pending: [],
+            accepted: [],
+            rejected: []
+        };
+        for (const request of requests) {
+            const reqObj = request.toObject();
+            reqObj.request_id = reqObj._id;
+            delete reqObj._id;
+            delete reqObj.__v;
+            
+            reqObj.activity = activity.activity;
+            reqObj.activity_id = activity._id;
+            reqObj.owner_id = activity.owner_id;
+            reqObj.date_time = `${formatDateTime(`${activity.date} ${activity.time}`, "datetime", true)}`;
+            reqObj.cat_avatar = activity.getCategoryImage();
+
+            const requestUser = await User.getUserById(request.user_id);
+
+            if(!isEmpty(requestUser)) {
+                reqObj.user_avatar = await getPhotoUrl(requestUser.photo_id, "icon");
+                reqObj.user_name = requestUser.getDisplayName();
+            }
+
+            const status = request.getStatus(request.status);
+            response[status].push(reqObj);
+        }
+
+        return res.sendResponse(response, 200);
 
     } catch (error) {
         res.sendResponse({

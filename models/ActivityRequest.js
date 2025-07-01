@@ -38,4 +38,12 @@ activityRequestSchema.statics.getActivityRequest = async function (activity, use
         });
 }
 
+activityRequestSchema.methods.getStatus = function (status) {
+    switch(status) {
+        case 1: return "accepted";
+        case 2: return "rejected";
+        default: return "pending";
+    }
+}
+
 export default mongoose.model("activity_request", activityRequestSchema);

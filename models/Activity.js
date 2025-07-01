@@ -1,4 +1,8 @@
+import "dotenv/config";
+
 import mongoose from "mongoose";
+import Location from "./Location.js";
+import ActivityRequest from "./ActivityRequest.js";
 
 const activitySchema = new mongoose.Schema({
     category_id: {
@@ -53,5 +57,15 @@ const activitySchema = new mongoose.Schema({
         default: 0,
     },
 });
+
+activitySchema.methods.deleteActivity = async function (ownerId) {
+    await this.deleteOne({ _id: this._id, owner_id: ownerId });
+    await Location.deleteOne({ activity_id: this._id });
+    await ActivityRequest.deleteMany({ activity_id: this._id });
+}
+
+activitySchema.methods.getCategoryImage = function () {
+    return `${process.env.BASE_URL}/api/upload/category/${this.category_id}.png`;
+}
 
 export default mongoose.model("activity", activitySchema);

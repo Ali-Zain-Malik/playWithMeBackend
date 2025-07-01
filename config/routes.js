@@ -3,7 +3,7 @@ import auth from "../middlewares/auth.js";
 
 import { signup, login, userProfile, logout } from "../controllers/userController.js";
 import { categories } from "../controllers/CategoryController.js";
-import { accept, cancel, create, edit, join, reject } from "../controllers/ActivityController.js";
+import { accept, cancel, create, deleteActivity, deleteRequest, edit, join, reject, requests } from "../controllers/ActivityController.js";
 
 import upload from "../utils/multer.js";
 
@@ -29,6 +29,9 @@ router.post("/app/activity/join", join);
 router.post("/app/activity/accept", accept);
 router.post("/app/activity/reject", reject);
 router.post("/app/activity/cancel", cancel);
+router.post("/app/activity/delete", deleteActivity);
+router.post("/app/activity/deleteRequest", deleteRequest);
+router.get("/app/activity/requests", requests);
 
 router.post("/app/logout", logout);
 
