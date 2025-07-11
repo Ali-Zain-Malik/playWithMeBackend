@@ -82,10 +82,10 @@ export function getRandomString(length = 5) {
 }
 
 export async function getPhotoUrl(photoId, type) {
-    if (isEmpty(photoId)) return "";
+    if (isEmpty(photoId)) return `${process.env.BASE_URL}/upload/default/nophoto_user.png`;
 
     const photo = await Attachment.findById(photoId);
-    if (isEmpty(photo)) return null;
+    if (isEmpty(photo)) return `${process.env.BASE_URL}/upload/default/nophoto_user.png`;
     let photoUrl = null;
     switch (type) {
         case "icon":
@@ -104,7 +104,7 @@ export async function getPhotoUrl(photoId, type) {
     return `${process.env.BASE_URL}/${photoUrl}`;
 }
 
-export function formatDateTime(timestamp, type = 'date', ampm = false) {
+export function formatDateTime(timestamp, type = 'date', ampm = false, humanReadable = false) {
     const dateObj = new Date(timestamp);
 
     const month = (dateObj.getMonth() + 1).toString().padStart(2, "0");
@@ -115,8 +115,16 @@ export function formatDateTime(timestamp, type = 'date', ampm = false) {
     const minutes = dateObj.getMinutes().toString().padStart(2, "0");
     const seconds = dateObj.getSeconds().toString().padStart(2, "0");
 
-    const formattedDate = `${year}-${month}-${day}`;
+    let formattedDate = `${year}-${month}-${day}`;
     let formattedTime = `${hours}:${minutes}:${seconds}`;
+
+    if (humanReadable) {
+        const monthNames = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        ];
+        formattedDate = `${day} ${monthNames[dateObj.getMonth()]}, ${year}`;
+    }
 
     if(ampm) {
         const suffix  = hours >= 12 ? "PM" : "AM";
@@ -133,4 +141,27 @@ export function formatDateTime(timestamp, type = 'date', ampm = false) {
     } else {
         return formattedDate+" "+formattedTime;
     }
+}
+
+export async function paginate(model, query = {}, options = {}) {
+    const page = parseInt(options.page, 10) > 0 ? parseInt(options.page, 10) : 1;
+    const limit = parseInt(options.limit, 10) > 0 ? parseInt(options.limit, 10) : 10;
+    const skip = (page - 1) * limit;
+
+    const [items, totalItems] = await Promise.all([
+        await model.find(query).skip(skip).limit(limit).sort({ _id: -1 }),
+        await model.countDocuments(query)
+    ]);
+
+    return {
+        items,
+        totalItems,
+        page,
+        limit,
+        totalPages: Math.ceil(totalItems / limit)
+    };
+}
+
+export function capitalizeFirstLetter(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
 }
