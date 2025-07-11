@@ -38,8 +38,9 @@ activityRequestSchema.statics.getActivityRequest = async function (activity, use
         });
 }
 
-activityRequestSchema.methods.getStatus = function (status) {
-    switch(status) {
+activityRequestSchema.methods.getStatus = function () {
+    switch(this.status) {
+        case 0: return "pending";
         case 1: return "accepted";
         case 2: return "rejected";
         default: return "pending";

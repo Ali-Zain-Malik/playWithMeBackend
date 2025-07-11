@@ -6,9 +6,11 @@ import Connection from "../models/Connection.js";
 import Location from "../models/Location.js";
 import NotificationType from "../models/NotificationType.js";
 
-import { verifyRequiredParams, validateLocation, formatDateTime, isEmpty, getPhotoUrl } from "../utils/functions.js";
+import { verifyRequiredParams, validateLocation, formatDateTime, isEmpty, getPhotoUrl, paginate } from "../utils/functions.js";
 import ActivityRequest from "../models/ActivityRequest.js";
 import User from "../models/User.js";
+import BlockedUser from "../models/BlockedUser.js";
+import Category from "../models/Category.js";
 
 export async function create(req, res) {
     try {
@@ -403,7 +405,7 @@ export async function deleteActivity(req, res) {
             return;
         }
 
-        await activity.deleteActivity(user._id);
+        await activity.deleteActivity();
 
         res.sendResponse({ message: "Deleted successfully" }, 200);
     } catch (error) {
@@ -490,7 +492,7 @@ export async function requests(req, res) {
             reqObj.activity = activity.activity;
             reqObj.activity_id = activity._id;
             reqObj.owner_id = activity.owner_id;
-            reqObj.date_time = `${formatDateTime(`${activity.date} ${activity.time}`, "datetime", true)}`;
+            reqObj.date_time = `${formatDateTime(`${activity.date} ${activity.time}`, "datetime", true, true)}`;
             reqObj.cat_avatar = activity.getCategoryImage();
 
             const requestUser = await User.getUserById(request.user_id);
@@ -500,8 +502,84 @@ export async function requests(req, res) {
                 reqObj.user_name = requestUser.getDisplayName();
             }
 
-            const status = request.getStatus(request.status);
+            const status = request.getStatus();
             response[status].push(reqObj);
+        }
+
+        return res.sendResponse(response, 200);
+
+    } catch (error) {
+        res.sendResponse({
+            message: "Internal server error",
+            error: error,
+        }, 201);
+    }
+}
+
+export async function detail(req, res) {
+    try {
+        const data = req.body;
+        verifyRequiredParams(['activityId'], data, res);
+
+        const activityId = data.activityId;
+        const viewer = req.user;
+        const viewerId = viewer ? viewer._id : null;
+
+        if (!isValidObjectId(activityId)) {
+            return res.sendResponse({ message: "Activity does not exist" }, 201);
+        }
+
+        const activity = await Activity.findById(activityId);
+        if (isEmpty(activity)) {
+            return res.sendResponse({ message: "Activity does not exist" }, 201);
+        }
+        const [location, category, owner] = await Promise.all([
+            Location.getLocation(activityId, "activity"),
+            Category.findOne({ category_id: activity.category_id }),
+            User.getUserById(activity.owner_id),
+        ]);
+
+        const response = { ...activity.toObject() };
+        response["activity_id"] = activity._id;
+        delete response._id;
+        delete response.__v;
+        
+        response.owner_title = owner.getDisplayName();
+        response.avatar = await getPhotoUrl(owner.photo_id, "icon");
+        response.cat_avatar = activity.getCategoryImage();
+        response.is_owner = false;
+        response.time = formatDateTime(`${activity.date} ${activity.time}`, "time", true);
+        response.date = formatDateTime(activity.date, "date", false, true);
+        response.date_android = formatDateTime(activity.date, "date");
+        response.creation_date = formatDateTime(`${activity.date} ${activity.time}`, "datetime");
+        response.latitude = location.latitude;
+        response.longitude = location.longitude;
+        response.location = location.location;
+        response.formatted_address = location.formatted_address;
+        response.categroy_title = category.title || null;
+
+        let isBlocked = false;
+
+        if (viewer) {
+            isBlocked = await BlockedUser.blockStatus(viewerId, owner._id);
+            response.is_blocked = isBlocked;
+
+            if (viewer.isOwner(activity.owner_id)) {
+                response.is_owner = true;
+                const requests = await ActivityRequest.find({ activity_id: activityId });
+                response.request_status = requests.length;
+            } else {
+                const requestObject = await ActivityRequest.getActivityRequest(activity, viewerId);
+                if (isEmpty(requestObject)) {
+                    response.request_status = 3;
+                } else {
+                    response.request_status = parseInt(requestObject.status, 10);
+                }
+            }
+        }
+
+        if (response.is_blocked) {
+            response.request_status = 4;
         }
 
         return res.sendResponse(response, 200);

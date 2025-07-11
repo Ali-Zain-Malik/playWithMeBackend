@@ -3,6 +3,10 @@ import "dotenv/config";
 import mongoose from "mongoose";
 import Location from "./Location.js";
 import ActivityRequest from "./ActivityRequest.js";
+import Connection from "./Connection.js";
+import User from "./User.js";
+
+import { formatDateTime, getPhotoUrl, isEmpty } from "../utils/functions.js";
 
 const activitySchema = new mongoose.Schema({
     category_id: {
@@ -58,14 +62,16 @@ const activitySchema = new mongoose.Schema({
     },
 });
 
-activitySchema.methods.deleteActivity = async function (ownerId) {
-    await this.deleteOne({ _id: this._id, owner_id: ownerId });
-    await Location.deleteOne({ activity_id: this._id });
-    await ActivityRequest.deleteMany({ activity_id: this._id });
+activitySchema.methods.deleteActivity = async function () {
+    await Promise.all([
+        Location.deleteOne({ resource_id: this._id, resource_type: "activity" }),
+        ActivityRequest.deleteMany({ activity_id: this._id }),
+        this.deleteOne(),
+    ]);
 }
 
 activitySchema.methods.getCategoryImage = function () {
-    return `${process.env.BASE_URL}/api/upload/category/${this.category_id}.png`;
+    return `${process.env.BASE_URL}/upload/category/${this.category_id}.png`;
 }
 
 export default mongoose.model("activity", activitySchema);
