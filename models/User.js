@@ -1,6 +1,11 @@
 import mongoose from "mongoose";
 import Location from "./Location.js";
 import Category from "./Category.js";
+import Activity from "./Activity.js";
+import Attachment from "./Attachment.js";
+import Conversation from "./Conversation.js";
+import Connection from "./Connection.js";
+
 import { getPhotoUrl, isEmpty } from "../utils/functions.js";
 
 import bcrypt from "bcrypt";
@@ -159,6 +164,51 @@ userSchema.methods.isOwner = function(ownerId) {
     }
 
     return this._id.toString() === ownerId.toString()
+}
+
+userSchema.methods.getActivitiesCount = async function(dateTime, categoryId = 0 ) {
+    const query = {
+        owner_id: this._id,
+        $expr: {
+            $gte: [
+                { $dateFromString: { dateString: { $concat: ["$date", "T", "$time"] } } },
+                dateTime
+            ]
+        }
+    };
+
+    if(!isEmpty(categoryId) && categoryId != 0) {
+        query.category_id = categoryId;
+    }
+
+    return await Activity.countDocuments(query);
+}
+
+userSchema.methods.delete = async function() {
+
+    const [userActivities, userConversations] = await Promise.all([
+        Activity.find({ owner_id: this._id }),
+        Conversation.find({ 
+            $or: [
+                { owner_id: this._id },
+                { receiver_id: this._id }
+            ]
+        }),
+    ]);
+
+    await Promise.all([
+        ...userActivities.map(activity => activity.deleteActivity()),
+        ...userConversations.map(conversation => conversation.delete()),
+        Location.deleteOne({ resource_id: this._id, resource_type: "user" }),
+        Attachment.deleteMany({ owner_id: this._id }),
+        Connection.deleteMany({ 
+            $or: [
+                { user_id: this._id },
+                { friend_id: this._id }
+            ]
+        }),
+        this.deleteOne(),
+    ]);
 }
 
 export default mongoose.model("user", userSchema);

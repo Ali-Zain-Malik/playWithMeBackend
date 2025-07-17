@@ -1,7 +1,7 @@
 import express from "express";
 import auth from "../middlewares/auth.js";
 
-import { signup, login, userProfile, logout } from "../controllers/userController.js";
+import { signup, login, userProfile, logout, update, updatePassword, block, unblock, profileStats, deleteUser } from "../controllers/UserController.js";
 import { categories } from "../controllers/CategoryController.js";
 import { accept, cancel, create, deleteActivity, deleteRequest, detail, edit, join, reject, requests } from "../controllers/ActivityController.js";
 
@@ -33,6 +33,15 @@ router.post("/app/activity/delete", deleteActivity);
 router.post("/app/activity/deleteRequest", deleteRequest);
 router.get("/app/activity/requests", requests);
 router.get("/app/activity/detail", detail);
+
+
+//User Related Routes
+router.post("/app/user/update", update);
+router.post("/app/user/password", updatePassword);
+router.post("/app/user/block", block);
+router.post("/app/user/unblock", unblock);
+router.get("/app/user/tabs", profileStats);
+router.post("/app/user/delete", deleteUser);
 
 router.post("/app/logout", logout);
 

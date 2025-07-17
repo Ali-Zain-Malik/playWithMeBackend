@@ -67,6 +67,10 @@ locationSchema.index({ geo: "2dsphere" });
 // Save or update a location
 locationSchema.statics.saveLocation = async function(values) {
     let locationId;
+    values.geo = {
+        type: "Point",
+        coordinates: [values.longitude, values.latitude],
+    }
     if (isEmpty(values._id)) {
         // Create new location
         const location = await this.create(values);
