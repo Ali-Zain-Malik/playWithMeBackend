@@ -3,7 +3,7 @@ import auth from "../middlewares/auth.js";
 
 import { signup, login, userProfile, logout, update, updatePassword, block, unblock, profileStats, deleteUser } from "../controllers/UserController.js";
 import { categories } from "../controllers/CategoryController.js";
-import { accept, cancel, create, deleteActivity, deleteRequest, detail, edit, join, reject, requests } from "../controllers/ActivityController.js";
+import { accept, cancel, create, deleteActivity, deleteRequest, detail, edit, join, reject, requests, userActivities, mine, nearbyActivities } from "../controllers/ActivityController.js";
 
 import upload from "../utils/multer.js";
 
@@ -15,6 +15,7 @@ router.post("/app/signup", upload.single("photo"), signup);
 router.post("/app/login", upload.none(), login);
 
 router.get("/app/categories", categories);
+router.get("/app/activity/map", upload.none(), nearbyActivities);
 
 router.use(auth);
 
@@ -33,7 +34,8 @@ router.post("/app/activity/delete", deleteActivity);
 router.post("/app/activity/deleteRequest", deleteRequest);
 router.get("/app/activity/requests", requests);
 router.get("/app/activity/detail", detail);
-
+router.get("/app/activity/user", userActivities);
+router.get("/app/activity/mine", mine);
 
 //User Related Routes
 router.post("/app/user/update", update);

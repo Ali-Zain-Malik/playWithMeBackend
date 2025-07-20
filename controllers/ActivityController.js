@@ -585,9 +585,172 @@ export async function detail(req, res) {
         return res.sendResponse(response, 200);
 
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
     }
 }
+
+export async function userActivities(req, res) {
+    try {
+        const viewer = req.user;
+        const data = req.body;
+
+        const categoryId = data.categoryId || null;
+        const currentDate = data.date || new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+        const currentTime = data.time || new Date().toTimeString().slice(0, 8); // "HH:mm:ss"
+        const nowDateTime = new Date(`${currentDate}T${currentTime}`);
+        let userId = data.id || viewer._id;
+
+        if(!isValidObjectId(userId)) {
+            return res.sendResponse({ message: "User not found." }, 201);
+        }
+        const userObject = await User.getUserById(userId);
+        if (isEmpty(userObject)) {
+            return res.sendResponse({ message: "User not found." }, 201);
+        }
+
+        const userLocation = await Location.getLocation(userId, "user");
+        if (isEmpty(userLocation)) {
+            return res.sendResponse({ message: "User location doesn't exist" }, 201);
+        }
+
+        const query = {
+           owner_id: userId,
+           ...(categoryId && { category_id: categoryId }),
+            $expr: {
+                $gte: [
+                    { $dateFromString: { dateString: { $concat: ["$date", "T", "$time"] } } },
+                    nowDateTime
+                ]
+            },
+        };
+
+        const options = { limit: data.limit || 10, page: data.page || 1 };
+        
+        const result = await paginate(Activity, query, options);
+
+        const activities = [];
+        for (const activity of result.items) {
+            const activityObject = activity.toObject();
+            activityObject.activity_id = activity._id;
+            delete activityObject._id;
+            delete activityObject.__v;
+
+            const activityLocation = await Location.getLocation(activityObject.activity_id, "activity");
+            if(!isEmpty(activityLocation)) {
+                activityObject.location = activityLocation.location;
+            }
+
+            activityObject.owner_title = userObject.getDisplayName();
+            activityObject.avatar = await getPhotoUrl(userObject.photo_id, "icon");
+            activityObject.cat_avatar = activity.getCategoryImage();
+            activityObject.is_owner = userObject.isOwner(activity.owner_id);
+            activityObject.time = formatDateTime(`${activity.date} ${activity.time}`, "time", true);
+            activityObject.date = formatDateTime(activity.date, "date", false, true);
+            activityObject.date_android = formatDateTime(activity.date, "date");
+            activityObject.creation_date = formatDateTime(`${activity.date} ${activity.time}`, "datetime");
+
+            activities.push(activityObject);
+        }
+
+        const response = {};
+        response.totalItemCount = result.totalItems;
+        response.activities = activities;
+        return res.sendResponse(response, 200);
+
+    } catch (error) {
+        return res.sendResponse({
+            message: "Internal server error",
+            error: error,
+        }, 201);
+    }
+}
+
+export async function mine(req, res) {
+    try {
+        const user = req.user;
+        const data = req.body;
+
+        let date = data.date || new Date().toISOString().slice(0, 10);
+        let time = data.time || new Date().toTimeString().slice(0, 8);
+        const showCount = !isEmpty(data.showCount) ? (data.showCount == 1 ? true : false) : false;
+        const activityType = data.type || null;
+        const userId = user._id;
+
+        const [followedActivities, pastActivities, currentActivities, pendingActivities, rejectedActivities] = await Promise.all([
+            Activity.getFollowedPeopleActivities(userId, date, time, showCount),
+            Activity.getPastActivities(userId, date, time, showCount),
+            Activity.getCurrentActivities(userId, date, time, showCount),
+            Activity.getPendingActivities(userId, date, time, showCount),
+            Activity.getRejectedActivities(userId, date, time, showCount),
+        ]);
+
+        const [followed, past, current, pending, rejected] = await Promise.all([
+            Activity.getActivitiesData(followedActivities, showCount),
+            Activity.getActivitiesData(pastActivities, showCount),
+            Activity.getActivitiesData(currentActivities, showCount),
+            Activity.getActivitiesData(pendingActivities, showCount),
+            Activity.getActivitiesData(rejectedActivities, showCount),
+        ]);
+
+        const response = {
+            current,
+            pending,
+            rejected,
+            followed,
+            past,
+        };
+
+        let finalResponse = response;
+        if (activityType && response.hasOwnProperty(activityType)) {
+            finalResponse = { activities: Array.isArray(response[activityType]) ? response[activityType] : [response[activityType]] };
+        }
+
+        return res.sendResponse(finalResponse, 200);
+    } catch (error) {
+        return res.sendResponse({
+            message: "Internal server error",
+            error: error,
+        }, 201);
+    }
+}
+
+export async function nearbyActivities(req, res) {
+    try {
+        const user = req.user;
+        const data = req.body;
+
+        const categoryId = data?.categoryId;
+        const date = data?.date || new Date().toISOString().slice(0, 10);
+        const time = data?.time || new Date().toTimeString().slice(0, 8);
+        const limit = parseInt(data?.limit) || 1000;
+        const page = parseInt(data?.page) || 1;
+        
+        let latitude = 0;
+        let longitude = 0;
+        let distance = parseFloat(data?.distance);
+        if (isNaN(distance)) {
+            distance = isEmpty(user) ? 100000000000 : 1000;
+        }
+        
+        const dateTime = new Date(`${date}T${time}`);
+
+        // If user is logged in
+        if (!isEmpty(user)) {
+            const userLocation = await Location.getLocation(user._id);
+            if (isEmpty(userLocation)) {
+                return res.sendResponse({ message: "User location doesn't exist" }, 201);
+            }
+
+            latitude = parseFloat(data?.latitude) || userLocation.latitude;
+            longitude = parseFloat(data?.longitude) || userLocation.longitude;
+        }
+
+        const activities = await Activity.getActivitiesByLocation(longitude, latitude, distance, dateTime, categoryId, limit, page);
+        return res.sendResponse(activities, 200);
+    } catch (error) {
+        return res.sendResponse({ message: "Internal server error", error }, 201);
+    }
+};
