@@ -3,6 +3,13 @@ import "dotenv/config";
 
 import Attachment from "../models/Attachment.js";
 
+/**
+ * 
+ * @param {Array} requiredFields Array of required fields
+ * @param {Array} params Array of all the incoming fields
+ * @param {Response} res Response Object
+ * @returns Boolean. If all params are passed then returns true, else false and a response.
+ */
 export function verifyRequiredParams(requiredFields, params, res) {
     let errorFields = [];
 
@@ -23,13 +30,15 @@ export function verifyRequiredParams(requiredFields, params, res) {
 
     if (errorFields.length > 0) {
         const message = `Required field(s) ${errorFields.join(', ')} is missing or empty`;
-        return res.sendResponse({
+        res.sendResponse({
             message,
             params,
         }, 201);
+        // Return false means any of param was missing or empty
+        return false;
     }
-    // Return false means no param was missing or empty
-    return false;
+    // Return true means no param was missing or empty
+    return true;
 }
 
 export function getHeader(req, header) {

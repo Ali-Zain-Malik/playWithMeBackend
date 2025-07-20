@@ -6,7 +6,7 @@ import Location from "../models/Location.js";
 import User from "../models/User.js";
 
 import { getRandomString, isEmpty, validateLocation, verifyRequiredParams, getPhotoUrl } from "../utils/functions.js";
-import { uploadPhoto } from "./AttachmentController.js";
+import { uploadPhoto } from "./attachmentController.js";
 
 import mongoose from "mongoose";
 const { isValidObjectId } = mongoose;
@@ -100,8 +100,10 @@ export async function login(req, res) {
         // Set the session.
         req.user = userData;
         const date = new Date();
-        await saveUser({user_id: user._id, last_login_date: date});
-        await Device.addDevice(data.pushId, data.pushType || "android", user._id);
+        await Promise.all([
+            saveUser({user_id: user._id, last_login_date: date}),
+            Device.addDevice(data.pushId, data.pushType || "android", user._id),
+        ]);
 
         res.sendResponse(userData, 200);
     } catch (error) {
@@ -109,6 +111,44 @@ export async function login(req, res) {
             message: "Internal server error",
             error: error,
         }, 201);
+    }
+}
+
+export async function socialLogin(req, res) {
+    try {
+        const data = req.body;
+        if(!verifyRequiredParams(['id', 'type'], data, res)) return;
+
+        const social_user_id = data?.id;
+        const social_type = data?.type?.trim();
+        const pushId = data?.pushId || null;
+        const pushType = data?.pushType || null;
+
+        const user = await User.findOne({
+            social_user_id,
+            social_type,
+        });
+
+        if (isEmpty(user)) {
+            return res.sendResponse({
+                message: "Invalid Login Details",
+                userExist: false,
+            }, 201);
+        }
+
+        const userData = await user.getUserData();
+        const response = {
+            ...userData,
+            userExist: true,
+        };
+        
+        if (!isEmpty(pushId)) {
+            await Device.addDevice(pushId, pushType, user._id);
+        }
+
+        return res.sendResponse(response, 200);
+    } catch (error) {
+        return res.sendResponse({ message: "Internal server error", error }, 201);
     }
 }
 
