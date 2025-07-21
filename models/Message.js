@@ -25,4 +25,23 @@ const messageSchema = new mongoose.Schema({
     },
 });
 
+messageSchema.statics.send = async function (conversation_id, user_id, body, date = new Date()) {
+    return await this.create({
+        conversation_id,
+        user_id,
+        body,
+        date,
+    });
+}
+
+messageSchema.statics.markAsRead = async function (conversation_id, user_id) {
+    await this.updateMany({
+        conversation_id,
+        user_id: { $ne: user_id },
+        read: false,
+    }, {
+        $set: { read: true }
+    });
+}
+
 export default mongoose.model("message", messageSchema);
