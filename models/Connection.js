@@ -17,6 +17,23 @@ const connectionSchema = new mongoose.Schema({
     },
 });
 
+connectionSchema.statics.addFriend = async function(user_id, friend_id) {
+    const friendShip = await this.create({
+        user_id,
+        friend_id,
+        status: 1,
+    });
+
+    return friendShip._id;
+}
+
+connectionSchema.methods.unfriend = async function (user_id, friend_id) {
+    return await this.deleteOne({
+        user_id,
+        friend_id,
+    });
+}
+
 connectionSchema.statics.isFriend = async function(user_id, friend_id) {
     return await this.findOne({
         user_id,

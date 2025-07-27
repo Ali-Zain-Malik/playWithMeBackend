@@ -81,7 +81,7 @@ export async function signup(req, res)
 
 export async function login(req, res) {
     const data = req.body;
-    verifyRequiredParams(['email', 'password'], data, res);
+    if(!verifyRequiredParams(['email', 'password'], data, res)) return;
     try {
         const email = data.email?.trim();
         const password = data.password?.trim();
@@ -105,9 +105,9 @@ export async function login(req, res) {
             Device.addDevice(data.pushId, data.pushType || "android", user._id),
         ]);
 
-        res.sendResponse(userData, 200);
+        return res.sendResponse(userData, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);

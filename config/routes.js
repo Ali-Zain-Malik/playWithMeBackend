@@ -4,7 +4,9 @@ import auth from "../middlewares/auth.js";
 import { signup, login, userProfile, logout, update, updatePassword, block, unblock, socialLogin, profileStats, deleteUser } from "../controllers/UserController.js";
 import { categories } from "../controllers/CategoryController.js";
 import { accept, cancel, create, deleteActivity, deleteRequest, detail, edit, join, reject, requests, userActivities, mine, nearbyActivities } from "../controllers/ActivityController.js";
-import { conversations, inbox, messages, send } from "../controllers/ConversationController.js";
+import { report } from "../controllers/ReportController.js";
+import { conversations, inbox, messages, send } from "../controllers/conversationController.js";
+import { addFriend, deleteConnection, followers, followings } from "../controllers/ConnectionController.js";
 
 import upload from "../utils/multer.js";
 
@@ -53,6 +55,13 @@ router.post("/app/sendmessage", send);
 router.get("/app/messages", messages);
 router.get("/app/inbox", inbox);
 
+// Connection Routes
+router.post("/app/friendship/add", addFriend);
+router.post("/app/friendship/leave", deleteConnection);
+router.get("/app/followers", followers);
+router.get("/app/followings", followings);
+
+router.post("/app/report", report);
 router.post("/app/logout", logout);
 
 export default router;
