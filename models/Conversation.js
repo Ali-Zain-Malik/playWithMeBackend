@@ -29,7 +29,6 @@ const conversationSchema = new mongoose.Schema({
 conversationSchema.statics.getConnects = async function(userId, limit, page) {
     const query = {
         $and: [
-            { status: 1 },
             { $or: [{ owner_id: userId }, { receiver_id: userId }] }
         ]
     };

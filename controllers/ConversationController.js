@@ -19,7 +19,7 @@ export async function conversations(req, res) {
 
         if (!isEmpty(connects)) {
             for (const connect of connects) {
-                let user_id = connect.user_id;
+                let user_id = connect.receiver_id;
                 const owner_id = connect.owner_id;
 
                 // If viewer is not the owner, swap user_id
@@ -37,7 +37,10 @@ export async function conversations(req, res) {
                 const photoUrl = await getPhotoUrl(userObject.photo_id, "icon");
 
                 // Get connected activities (implement getConnectedActivities on Conversation model)
-                const activities = await Conversation.getConnectedActivities(viewerId, user_id);
+                const activities = await Conversation.getConnectedActivities(
+                viewerId,
+                user_id
+                );
 
                 response.connections.push({
                     user_id: userObject._id,
@@ -69,7 +72,7 @@ export async function send(req, res) {
         if(!isValidObjectId(receiverId)) {
             return res.sendResponse({ message: "Invalid Receiver Id"}, 201);
         }
-        const receiver = await User.findOne({ _id: receiverId });
+        const receiver = User.findOne({ _id: receiverId });
         if(isEmpty(receiver)) {
             return res.sendResponse({ message: "Receiver not found" }, 201);
         }

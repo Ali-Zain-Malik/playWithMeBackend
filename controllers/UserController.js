@@ -6,7 +6,7 @@ import Location from "../models/Location.js";
 import User from "../models/User.js";
 
 import { getRandomString, isEmpty, validateLocation, verifyRequiredParams, getPhotoUrl } from "../utils/functions.js";
-import { uploadPhoto } from "./attachmentController.js";
+import { uploadPhoto } from "./AttachmentController.js";
 
 import mongoose from "mongoose";
 const { isValidObjectId } = mongoose;
@@ -16,7 +16,7 @@ import bcrypt from "bcrypt";
 export async function signup(req, res)
 {
     const data = req.body;
-    verifyRequiredParams(['name', 'email', 'password', 'aboutMe'], data, res);
+    if(!verifyRequiredParams(['name', 'email', 'password', 'aboutMe'], data, res)) return;
     try {
         const values = {
             first_name: data.name?.trim(),
@@ -36,7 +36,7 @@ export async function signup(req, res)
         }
 
         const locationObject = data.location || {};
-        validateLocation(locationObject, res);
+        if(!validateLocation(locationObject, res)) return;
 
         values.encrypt = Buffer.from(values.password).toString("base64");
         values.password = await bcrypt.hash(values.password, 10);
@@ -70,9 +70,9 @@ export async function signup(req, res)
         req.user = userData;
         await Device.addDevice(data.pushId, data.pushType || "android", userId);
 
-        res.sendResponse(userData, 200);
+        return res.sendResponse(userData, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -177,7 +177,7 @@ async function saveUser(values) {
 
 export async function userProfile(req, res) {
     try {
-        let userId = req.query.id;
+        let userId = req.body?.id;
         const viewerId = req.user._id;
         if(isEmpty(userId)) {
             userId = viewerId;
@@ -196,35 +196,46 @@ export async function userProfile(req, res) {
     
         const userLocation = await Location.getLocation(userId, "user");
         if(isEmpty(userLocation)) {
-            res.sendResponse({message: "User location does\'t exist"}, 201);
+            return res.sendResponse({message: "User location does\'t exist"}, 201);
         }
     
-        const userCategory = await Category.getCategory(userObject.category_id);
-        const isFriend = await Connection.isFriend(viewerId, userId);
+        const [name, avatar, userCategory, isFriend, is_blocked, is_blocked_byme, followers, followings] = await Promise.all([
+            userObject.getDisplayName(),
+            getPhotoUrl(userObject.photo_id, "icon"),
+            Category.getCategory(userObject.category_id),
+            Connection.isFriend(viewerId, userId),
+            BlockedUser.blockStatus(viewerId, userId),
+            BlockedUser.blockStatus(userId, viewerId),
+            Connection.getFollowersCount(userId),
+            Connection.getFollowingsCount(userId),
+        ]);
     
         const response = {
             id: userObject._id, 
-            is_blocked: await BlockedUser.blockStatus(viewerId, userId),
-            is_blocked_byme: await BlockedUser.blockStatus(userId, viewerId),
-            name: String(await userObject.getDisplayName()),
-            avatar: await getPhotoUrl(userObject.photo_id, "icon"),
+            is_blocked: is_blocked,
+            is_blocked_byme: is_blocked_byme,
+            name: String(name),
+            avatar: avatar,
             age: String(userObject.age),
             gender: String(userObject.gender),
             about_me: String(userObject.about_me),
             city: String(userLocation?.city || ""),
             country: String(userLocation?.country || ""),
             location: String(userLocation?.location || ""),
+            location_id: userLocation?._id || "",
+            longitude: userLocation?.longitude || 0,
+            latitude: userLocation?.latitude || 0,
             is_owner: userObject.isOwner(viewerId),
             subscribed: isFriend ? 1 : 0,
-            followers: await Connection.getFollowersCount(userId),
-            followings: await Connection.getFollowingsCount(userId),
+            followers: followers,
+            followings: followings,
             category_id: Number(userObject.category_id),
             category_name: userCategory?.title ? String(userCategory.title) : ""
         };
     
-        res.sendResponse(response, 200);
+        return res.sendResponse(response, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -244,10 +255,10 @@ export async function logout(req, res) {
         }
         delete req.user;
 
-        res.sendResponse({ message: "You have successfully logged out." }, 200);
+        return res.sendResponse({ message: "You have successfully logged out." }, 200);
         return;
     } catch(error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -257,7 +268,7 @@ export async function logout(req, res) {
 export async function update(req, res) {
     const data = req.body;
     const user = req.user;
-    verifyRequiredParams(['name', 'aboutMe'], data, res);
+    if(!verifyRequiredParams(['name', 'aboutMe'], data, res)) return;
     try {
         const values = {
             first_name: data.name?.trim(),
@@ -295,9 +306,9 @@ export async function update(req, res) {
 
         const userData = await userObject.getUserData();
         userData.message = "Your changes have been saved successfully.";
-        res.sendResponse(userData, 200);
+        return res.sendResponse(userData, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -308,7 +319,7 @@ export async function updatePassword(req, res) {
     try {
         const user = req.user;
         const data = req.body;
-        verifyRequiredParams(['newPassword', 'oldPassword'], data, res);
+        if(!verifyRequiredParams(['newPassword', 'oldPassword'], data, res)) return;
 
         const newPassword = data.newPassword?.trim();
         const oldPassword = data.oldPassword?.trim();
@@ -329,7 +340,7 @@ export async function updatePassword(req, res) {
         await saveUser(values);
         return res.sendResponse({ message: "Password changed successfully." }, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -341,7 +352,7 @@ export async function block(req, res) {
         const owner_id = req.user._id;
         const user_id = req.body.user_id;
 
-        verifyRequiredParams(['user_id'], req.body, res);
+        if(!verifyRequiredParams(['user_id'], req.body, res)) return;
         if (!isValidObjectId(user_id)) {
             return res.sendResponse({ message: "User Not Found" }, 201);
         }
@@ -358,7 +369,7 @@ export async function block(req, res) {
 
         return res.sendResponse({ message: "User blocked successfully." }, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -370,7 +381,7 @@ export async function unblock(req, res) {
         const owner_id = req.user._id;
         const user_id = req.body.user_id;
 
-        verifyRequiredParams(['user_id'], req.body, res);
+        if(!verifyRequiredParams(['user_id'], req.body, res)) return;
         if (!isValidObjectId(user_id)) {
             return res.sendResponse({ message: "User Not Found" }, 201);
         }
@@ -384,7 +395,7 @@ export async function unblock(req, res) {
 
         return res.sendResponse({ message: "User unblocked successfully." }, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);

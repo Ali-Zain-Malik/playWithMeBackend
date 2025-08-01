@@ -15,8 +15,8 @@ import Category from "../models/Category.js";
 export async function create(req, res) {
     try {
         const data = req.body;
-        verifyRequiredParams(['categoryId', 'date', 'time', 'activity', 'description', 'number', 'startAge', 'endAge', 'skill', 'gender'], data, res);
-        validateLocation(data.location, res);
+        if(!verifyRequiredParams(['categoryId', 'date', 'time', 'activity', 'description', 'number', 'startAge', 'endAge', 'skill', 'gender'], data, res)) return;
+        if(!validateLocation(data.location, res)) return;
         
         const date = data.date || new Date();
         const time = data.time ? `${date} ${data.time}` : new Date(); // Merging date, to prevent Date(timestamp) error
@@ -62,9 +62,9 @@ export async function create(req, res) {
             ...activityData,
             location: locationObject,
         }
-        res.sendResponse(response, 200);
+        return res.sendResponse(response, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -92,8 +92,8 @@ async function saveActivity(values) {
 export async function edit(req, res) {
     try {
         const data = req.body;
-        verifyRequiredParams(['activityId', 'categoryId',  'locationId', 'date', 'time', 'activity', 'description', 'number', 'startAge', 'endAge', 'skill', 'gender'], data, res);
-        validateLocation(data.location, res);
+        if(!verifyRequiredParams(['activityId', 'categoryId',  'locationId', 'date', 'time', 'activity', 'description', 'number', 'startAge', 'endAge', 'skill', 'gender'], data, res)) return;
+        if(!validateLocation(data.location, res)) return;
         
         if(!isValidObjectId(data.activityId)) {
             res.sendResponse({message: "Activity not found."}, 201);
@@ -110,6 +110,7 @@ export async function edit(req, res) {
         const userId = user._id;
         if(!user.isOwner(activity.owner_id)) {
             res.sendResponse({message: "Unauthorized"}, 201)
+            return;
         }
 
         const date = data.date || new Date();
@@ -150,9 +151,9 @@ export async function edit(req, res) {
             ...activityData,
             location: locationObject,
         }
-        res.sendResponse(response, 200);
+        return res.sendResponse(response, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -180,7 +181,7 @@ async function saveActivityRequest(values) {
 export async function join(req, res) {
     try {
         const data = req.body;
-        verifyRequiredParams(['activityId'], data, res);
+        if(!verifyRequiredParams(['activityId'], data, res)) return;
     
         const activityId = data.activityId;
         const userMessage = data.userMessage?.trim() || null;
@@ -217,9 +218,9 @@ export async function join(req, res) {
         }
         
         await saveActivityRequest(values);
-        res.sendResponse({ message: "Request sent successfully" }, 200);
+        return res.sendResponse({ message: "Request sent successfully" }, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -229,7 +230,7 @@ export async function join(req, res) {
 export async function accept(req, res) {
     try {
         const data = req.body;
-        verifyRequiredParams(['activityId', 'userId'], data, res);
+        if(!verifyRequiredParams(['activityId', 'userId'], data, res)) return;
         
         const activityId = data.activityId;
         const userId = data.userId;
@@ -261,9 +262,9 @@ export async function accept(req, res) {
         }
 
         await saveActivityRequest(values);
-        res.sendResponse({ message: "Request Accepted" }, 200);
+        return res.sendResponse({ message: "Request Accepted" }, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -273,7 +274,7 @@ export async function accept(req, res) {
 export async function reject(req, res) {
     try {
         const data = req.body;
-        verifyRequiredParams(['activityId', 'userId'], data, res);
+        if(!verifyRequiredParams(['activityId', 'userId'], data, res)) return;
         
         const activityId = data.activityId;
         const userId = data.userId;
@@ -311,9 +312,9 @@ export async function reject(req, res) {
         }
 
         await saveActivityRequest(values);
-        res.sendResponse({ message: "Request Rejected" }, 200);
+        return res.sendResponse({ message: "Request Rejected" }, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -325,7 +326,7 @@ export async function cancel(req, res) {
         const user = req.user;
         const data = req.body;
 
-        verifyRequiredParams(['activityId'], data, res);
+        if(!verifyRequiredParams(['activityId'], data, res)) return;
 
         const activityId = data.activityId;
         const ownerMessage = data.ownerMessage?.trim() || null;
@@ -376,7 +377,7 @@ export async function cancel(req, res) {
         return res.sendResponse({ message: "Cancelled successfully" }, 200);
 
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -387,7 +388,7 @@ export async function deleteActivity(req, res) {
     try {
         const data = req.body;
         const user = req.user;
-        verifyRequiredParams(['activityId'], data, res);
+        if(!verifyRequiredParams(['activityId'], data, res)) return;
         
         const activityId = data.activityId;
         if(!isValidObjectId(activityId)) {
@@ -407,9 +408,9 @@ export async function deleteActivity(req, res) {
 
         await activity.deleteActivity();
 
-        res.sendResponse({ message: "Deleted successfully" }, 200);
+        return res.sendResponse({ message: "Deleted successfully" }, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -420,7 +421,7 @@ export async function deleteRequest(req, res) {
     try {
         const data = req.body;
         const user = req.user;
-        verifyRequiredParams(['activityId', 'userId'], data, res);
+        if(!verifyRequiredParams(['activityId', 'userId'], data, res)) return;
 
         const activityId = data.activityId;
         const userId = data.userId;
@@ -454,7 +455,7 @@ export async function deleteRequest(req, res) {
 
         return res.sendResponse({ message: "Deleted successfully" }, 200);
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -464,7 +465,7 @@ export async function deleteRequest(req, res) {
 export async function requests(req, res) {
     try {
         const data = req.body;
-        verifyRequiredParams(['activityId'], data, res);
+        if(!verifyRequiredParams(['activityId'], data, res)) return;
 
         const activityId = data.activityId;
 
@@ -509,7 +510,7 @@ export async function requests(req, res) {
         return res.sendResponse(response, 200);
 
     } catch (error) {
-        res.sendResponse({
+        return res.sendResponse({
             message: "Internal server error",
             error: error,
         }, 201);
@@ -519,7 +520,7 @@ export async function requests(req, res) {
 export async function detail(req, res) {
     try {
         const data = req.body;
-        verifyRequiredParams(['activityId'], data, res);
+        if(!verifyRequiredParams(['activityId'], data, res)) return;
 
         const activityId = data.activityId;
         const viewer = req.user;
@@ -552,11 +553,12 @@ export async function detail(req, res) {
         response.date = formatDateTime(activity.date, "date", false, true);
         response.date_android = formatDateTime(activity.date, "date");
         response.creation_date = formatDateTime(`${activity.date} ${activity.time}`, "datetime");
+        response.location_id = location._id;
         response.latitude = location.latitude;
         response.longitude = location.longitude;
         response.location = location.location;
         response.formatted_address = location.formatted_address;
-        response.categroy_title = category.title || null;
+        response.category_title = category.title || null;
 
         let isBlocked = false;
 
@@ -754,3 +756,67 @@ export async function nearbyActivities(req, res) {
         return res.sendResponse({ message: "Internal server error", error }, 201);
     }
 };
+
+export async function activities(req, res) {
+    try {
+        const viewer = req.user || null;
+        const data = req.body;
+
+        const categoryId = data?.categoryId || 0;
+        const date = data?.date || new Date().toISOString().slice(0, 10);
+        const time = data?.time || new Date().toTimeString().slice(0, 8);
+        const dateTime = new Date(`${date}T${time}`);
+        const limit = parseInt(data?.limit) || 10;
+        const page = parseInt(data?.page) || 1;
+        let distance = parseFloat(data?.distance);
+        if (isNaN(distance)) {
+            distance = isEmpty(viewer) ? 100000000000 : 1000;
+        }
+
+        let userLocation = null;
+        let longitude = 0;
+        let latitude = 0;
+        if (!isEmpty(viewer)) {
+            userLocation = await Location.getLocation(viewer._id, "user");
+            if (isEmpty(userLocation)) {
+                return res.sendResponse({ message: "User location doesn't exist" }, 201);
+            }
+            latitude = parseFloat(data?.latitude) || userLocation.latitude;
+            longitude = parseFloat(data?.longitude) || userLocation.longitude;
+        }
+
+        const response = {
+            activities: [],
+            totalItemCount: 0, // By default
+        };
+
+        const activities = await Activity.getActivitiesByLocation(longitude, latitude, distance, dateTime, categoryId, limit, page);
+        if (!isEmpty(activities)) {
+            const activityDataList = await Promise.all(
+                activities.map(activity => {
+                    const enrichedActivity = {
+                        ...activity,
+                        _id: activity.activity_id
+                    };
+                    return new Activity(enrichedActivity).getListingData();
+                })
+            );
+            response.activities.push(...activityDataList);
+            response.totalItemCount = activityDataList.length;
+        }
+
+        const categoryItems = await Category.find({});
+        const categories = [
+            { category_id: 0, category_title: "All" },
+            ...categoryItems.map(cat => ({
+                category_id: cat.category_id,
+                category_title: cat.title
+            }))
+        ];
+        response.categories = categories;
+
+        return res.sendResponse(response, 200);
+    } catch (error) {
+        return res.sendResponse({ message: 'Internal server error' }, 201);
+    }
+}
